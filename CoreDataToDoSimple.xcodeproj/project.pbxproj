@@ -325,6 +325,7 @@
 				FB2099E51F1E131B000F6A26 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 

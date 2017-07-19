@@ -57,7 +57,7 @@
     }
     [_table_View reloadData];
 }
-
+/*
 #pragma mark - Add Dummy Values for Testing
 -(void)addtodolist
 {
@@ -72,9 +72,10 @@
         [dateFormatter setTimeZone:[NSTimeZone localTimeZone]];
         NSString *str_Date = [dateFormatter stringFromDate:[NSDate date]];
         
-       // [self addCoreDateValues:YES Title:str_Title Desc:str_Desc Date:str_Date completed:@"N" stats:@"Y"];
+      // [self addCoreDateValues:YES Title:str_Title Desc:str_Desc Date:str_Date completed:@"N" stats:@"Y"];
     }
 }
+*/
 
 #pragma mark - Add or Update Core data values
 // все атрибуты сущности из модели
@@ -105,12 +106,201 @@
     }
 }
 
+#pragma mark - UITableViewDataSource
+
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView
+{
+    // количество секциий
+    return 1;
+}
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
+{
+    // количество строк в секции
+    return self.todolist.count;
+}
+
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    static NSString *CellIdentifier = @"Cell";
+    UITableViewCell *cell = (UITableViewCell *)[tableView dequeueReusableCellWithIdentifier:CellIdentifier];
+    if (cell == nil) {
+        cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:CellIdentifier];
+        
+    //настройка данный в ячейке
+        NSManagedObject *todo_object = [self.todolist objectAtIndex:indexPath.row];
+        NSString *str_Title_Txt = [[NSString stringWithFormat:@"%@", [todo_object valueForKey:@"title"]]uppercaseString];
+        [cell.textLabel setText:str_Title_Txt];
+        
+        [cell.detailTextLabel setText:[NSString stringWithFormat:@"Created Date: %@", [todo_object valueForKey:@"datetime"]]];
+        [cell.detailTextLabel setFont:[UIFont fontWithName:@"Times New Roman" size:10.0]];
+        if ([[todo_object valueForKey:@"complited"] isEqualToString:@"Y"]) {
+            cell.textLabel.textColor = [UIColor lightGrayColor];
+            cell.detailTextLabel.textColor = [UIColor lightGrayColor];
+        } else {
+            cell.textLabel.textColor = [UIColor greenColor];
+            cell.textLabel.textColor = [UIColor greenColor];
+        }
+    }
+    return cell;
+}
+//возможность редактирования
+- (BOOL)tableView:(UITableView *)tableView canEditRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    // Return NO if you do not want the specified item to be editable.
+    return YES;
+}
+//удаление из базы и из таблицы
+- (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath {
+    
+    NSManagedObjectContext *context =[self managedObjectContext];
+    if (editingStyle == UITableViewCellEditingStyleDelete) {
+        //удаление из базы
+        [context deleteObject:[self.todolist objectAtIndex:indexPath.row]];
+        NSError *error = nil;
+        if (![context save:&error]) {
+            NSLog(@"Can't Delete! %@ %@", error, [error localizedDescription]);
+            return;
+            //удаление из таблицы
+            [self.todolist removeObjectAtIndex:indexPath.row];
+            [_table_View deleteRowsAtIndexPaths:[NSArray arrayWithObject:indexPath] withRowAnimation:UITableViewRowAnimationFade];
+            
+            _lbl_nodata.alpha = 0.0;
+            if (self.todolist.count == 0)
+            {
+                _lbl_nodata.alpha = 1.0;
+            }
+        }
+    }
+}
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    self.selected_Todo = nil;
+    NSManagedObject *selectedTodo = [self.todolist objectAtIndex:indexPath.row]; //[[table_View indexPathForSelectedRow] row]
+    self.selected_Todo = selectedTodo;
+    [self open_AddEditView:NO];
+}
+
+#pragma mark - Show and Hide the AddEditView
+-(void)open_AddEditView:(BOOL)AddNew
+{
+    _view_EditAdd.alpha = 1.0;
+    CABasicAnimation *animation = [CABasicAnimation animationWithKeyPath:@"transform.scale"];
+    [animation setFromValue:[NSNumber numberWithFloat:0.0f]];
+    [animation setToValue:[NSNumber numberWithFloat:1.0f]];
+    [animation setDuration:0.2];
+    [animation setBeginTime:CACurrentMediaTime()];
+    [animation setRemovedOnCompletion:NO];
+    [animation setFillMode:kCAFillModeForwards];
+    [[_view_EditAdd layer] addAnimation:animation forKey:@"scale"];
+    
+    [_btn_AddUpdate setTag:100];
+    [_btn_AddUpdate setTitle:@"ADD" forState:UIControlStateNormal];
+    [_txtfld_Title setText:@""];
+    [_textfld_Desc setText:@""];
+    _segctrl_completed.selectedSegmentIndex = 0;
+    
+    if (AddNew == NO)
+    {
+        [_btn_AddUpdate setTag:200];
+        [_btn_AddUpdate setTitle:@"UPDATE" forState:UIControlStateNormal];
+        
+        [_txtfld_Title setText:[self.selected_Todo valueForKey:@"title"]];
+        [_textfld_Desc setText:[self.selected_Todo valueForKey:@"desc"]];
+        NSString *str_txt_segment = [[self.selected_Todo valueForKey:@"completed"] uppercaseString];
+        if ([str_txt_segment isEqualToString:@"Y"])
+        {
+            _segctrl_completed.selectedSegmentIndex = 1;
+        }
+        else
+        {
+            _segctrl_completed.selectedSegmentIndex = 0;
+        }
+    }
+}
+
+-(void)hide_AddEditView
+{
+    CABasicAnimation *animation = [CABasicAnimation animationWithKeyPath:@"transform.scale"];
+    [animation setFromValue:[NSNumber numberWithFloat:1.0f]];
+    [animation setToValue:[NSNumber numberWithFloat:0.0f]];
+    [animation setDuration:0.2];
+    [animation setBeginTime:CACurrentMediaTime()];
+    [animation setRemovedOnCompletion:NO];
+    [animation setFillMode:kCAFillModeForwards];
+    [[_view_EditAdd layer] addAnimation:animation forKey:@"scale"];
+    
+    [self performSelector:@selector(hide_ViewEditAdd) withObject:nil afterDelay:0.2];
+}
+
+-(void)hide_ViewEditAdd
+{
+    _view_EditAdd.alpha = 0.0;
+}
+
+
+
 - (IBAction)AddNew_Todo:(id)sender {
+    [self open_AddEditView:YES];
 }
 
 - (IBAction)save_AddEditView:(id)sender {
+    
+    {
+        [_txtfld_Title resignFirstResponder];
+        [_textfld_Desc resignFirstResponder];
+        
+        UIButton *btn = (UIButton *)sender;
+        int btn_tag = (int)btn.tag;
+        
+        NSString *str_Title = [NSString stringWithFormat:@"%@", _txtfld_Title.text];
+        NSString *str_Desc = [NSString stringWithFormat:@"%@", _textfld_Desc.text];
+        
+        if (str_Title.length > 0 && str_Desc.length > 0)
+        {
+            NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
+            [dateFormatter setDateStyle:NSDateFormatterLongStyle];
+            [dateFormatter setTimeStyle:NSDateFormatterShortStyle];
+            [dateFormatter setTimeZone:[NSTimeZone localTimeZone]];
+            NSString *str_Date = [dateFormatter stringFromDate:[NSDate date]];
+            
+            NSString *str_Completed = [NSString stringWithFormat:@"N"];
+            if (_segctrl_completed.selectedSegmentIndex == 1)
+            {
+                str_Completed = [NSString stringWithFormat:@"Y"];
+            }
+            if (btn_tag == 200)
+            {
+                [self addCoreDataValues:NO Title:str_Title Desc:str_Desc Date:str_Date completed:str_Completed stats:@"Y"];
+            }
+            else
+            {
+                [self addCoreDataValues:NO Title:str_Title Desc:str_Desc Date:str_Date completed:str_Completed stats:@"Y"];
+            }
+            [self hide_AddEditView];
+            [self load_CoreData];
+        }
+        else
+        {
+            UIAlertView *alert = [[UIAlertView alloc]initWithTitle:@"Message" message:@"Fill the details" delegate:self cancelButtonTitle:@"OK" otherButtonTitles: nil];
+            [alert show];
+        }
+    }
 }
 
 - (IBAction)close_AddEditView:(id)sender {
+    [self hide_AddEditView];
 }
-@end
+
+#pragma mark - Text Field Delegates
+- (BOOL)textFieldShouldReturn:(UITextField *)textField
+{
+    [textField resignFirstResponder];
+    return YES;
+}
+
+
+    @end
+
+
